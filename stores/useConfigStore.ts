@@ -1,6 +1,6 @@
 import { NavData as DefaultNavConfig } from "@/config/site"
 import { create } from "zustand"
-import { createJSONStorage, persist } from "zustand/middleware"
+import { secureNavConfigService } from "@/lib/secureNavConfigService"
 
 // Export initial data for reset functionality
 export const initialNavData = DefaultNavConfig
@@ -19,9 +19,12 @@ export interface NavCategory {
 }
 
 interface NavConfigState {
-  // 状态属性改为小驼峰
+  // 状态属性
   categories: NavCategory[]
-  // 操作方法命名优化：移除冗余的Nav前缀
+  isLoading: boolean
+  error: string | null
+  
+  // 操作方法
   setCategories: (data: NavCategory[]) => void
   addCategory: (category: NavCategory) => void
   updateCategory: (index: number, category: NavCategory) => void
@@ -29,56 +32,122 @@ interface NavConfigState {
   addLink: (categoryIndex: number, link: NavLinkItem) => void
   updateLink: (categoryIndex: number, linkIndex: number, link: NavLinkItem) => void
   removeLink: (categoryIndex: number, linkIndex: number) => void
+  
+  // 异步操作方法
+  loadCategories: () => Promise<void>
+  saveCategories: () => Promise<void>
+  resetToDefault: () => Promise<void>
+  
+  // 状态管理方法
+  setLoading: (loading: boolean) => void
+  setError: (error: string | null) => void
 }
 
-export const useConfigStore = create<NavConfigState>()(
-  persist(
-    (set) => ({
-      // 使用更明确的初始值命名
-      categories: initialNavData, // Use the exported initialNavData here
-      setCategories: (data) => set({ categories: data }),
-      addCategory: (category) => set((state) => ({ categories: [...state.categories, category] })),
-      updateCategory: (index, category) =>
-        set((state) => {
-          const updated = [...state.categories]
-          updated[index] = category
-          return { categories: updated }
-        }),
-      removeCategory: (index) =>
-        set((state) => ({
-          categories: state.categories.filter((_, i) => i !== index)
-        })),
-      addLink: (categoryIndex, link) =>
-        set((state) => {
-          const updated = [...state.categories]
-          updated[categoryIndex] = {
-            ...updated[categoryIndex],
-            items: [...updated[categoryIndex].items, link]
-          }
-          return { categories: updated }
-        }),
-      updateLink: (categoryIndex, linkIndex, link) =>
-        set((state) => {
-          const updated = [...state.categories]
-          updated[categoryIndex] = {
-            ...updated[categoryIndex],
-            items: updated[categoryIndex].items.map((item, i) => (i === linkIndex ? link : item))
-          }
-          return { categories: updated }
-        }),
-      removeLink: (categoryIndex, linkIndex) =>
-        set((state) => {
-          const updated = [...state.categories]
-          updated[categoryIndex] = {
-            ...updated[categoryIndex],
-            items: updated[categoryIndex].items.filter((_, i) => i !== linkIndex)
-          }
-          return { categories: updated }
-        })
+export const useConfigStore = create<NavConfigState>((set, get) => ({
+  // 初始状态
+  categories: [],
+  isLoading: false,
+  error: null,
+
+  // 同步操作方法（只更新本地状态）
+  setCategories: (data) => set({ categories: data }),
+  
+  addCategory: (category) => set((state) => ({ 
+    categories: [...state.categories, category] 
+  })),
+  
+  updateCategory: (index, category) =>
+    set((state) => {
+      const updated = [...state.categories]
+      updated[index] = category
+      return { categories: updated }
     }),
-    {
-      name: "nav-config-store",
-      storage: createJSONStorage(() => localStorage)
+    
+  removeCategory: (index) =>
+    set((state) => ({
+      categories: state.categories.filter((_, i) => i !== index)
+    })),
+    
+  addLink: (categoryIndex, link) =>
+    set((state) => {
+      const updated = [...state.categories]
+      updated[categoryIndex] = {
+        ...updated[categoryIndex],
+        items: [...updated[categoryIndex].items, link]
+      }
+      return { categories: updated }
+    }),
+    
+  updateLink: (categoryIndex, linkIndex, link) =>
+    set((state) => {
+      const updated = [...state.categories]
+      updated[categoryIndex] = {
+        ...updated[categoryIndex],
+        items: updated[categoryIndex].items.map((item, i) => (i === linkIndex ? link : item))
+      }
+      return { categories: updated }
+    }),
+    
+  removeLink: (categoryIndex, linkIndex) =>
+    set((state) => {
+      const updated = [...state.categories]
+      updated[categoryIndex] = {
+        ...updated[categoryIndex],
+        items: updated[categoryIndex].items.filter((_, i) => i !== linkIndex)
+      }
+      return { categories: updated }
+    }),
+
+  // 异步操作方法
+  loadCategories: async () => {
+    set({ isLoading: true, error: null })
+    try {
+      const categories = await secureNavConfigService.getNavConfig()
+      
+      // 如果获取的数据为空，使用默认配置
+      if (categories.length === 0) {
+        set({ categories: initialNavData })
+      } else {
+        set({ categories })
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '加载配置失败'
+      set({ error: errorMessage, categories: initialNavData }) // 失败时使用默认配置
+      console.error('加载配置失败:', error)
+    } finally {
+      set({ isLoading: false })
     }
-  )
-)
+  },
+
+  saveCategories: async () => {
+    const { categories } = get()
+    set({ isLoading: true, error: null })
+    try {
+      await secureNavConfigService.saveNavConfig(categories)
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '保存配置失败'
+      set({ error: errorMessage })
+      throw error // 重新抛出错误，让调用方处理
+    } finally {
+      set({ isLoading: false })
+    }
+  },
+
+  resetToDefault: async () => {
+    set({ isLoading: true, error: null })
+    try {
+      await secureNavConfigService.resetToDefault(initialNavData)
+      set({ categories: initialNavData })
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : '重置配置失败'
+      set({ error: errorMessage })
+      throw error
+    } finally {
+      set({ isLoading: false })
+    }
+  },
+
+  // 状态管理方法
+  setLoading: (loading) => set({ isLoading: loading }),
+  setError: (error) => set({ error })
+}))

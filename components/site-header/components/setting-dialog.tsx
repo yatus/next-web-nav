@@ -17,20 +17,31 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useToast } from "@/components/ui/use-toast"
 import { cn } from "@/lib/utils"
+import { AdminPasswordDialog } from "@/components/admin-password-dialog"
 
 const SettingDialog = () => {
-  const categories = useConfigStore((state) => state.categories)
+  const { categories, isLoading, error, saveCategories, resetToDefault } = useConfigStore()
   const [open, setOpen] = useState(false)
   const [isResetting, setIsResetting] = useState(false)
   const [localCategories, setLocalCategories] = useState<NavCategory[]>([])
+  const [isSaving, setIsSaving] = useState(false)
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
   const { toast } = useToast()
 
   useEffect(() => {
-    if (open) {
+    if (open && isAuthenticated) {
       setLocalCategories(JSON.parse(JSON.stringify(categories)))
       setIsResetting(false)
     }
-  }, [open, categories])
+  }, [open, categories, isAuthenticated])
+
+  // 重置认证状态当对话框关闭时
+  useEffect(() => {
+    if (!open) {
+      setIsAuthenticated(false)
+    }
+  }, [open])
 
   const handleCategoryChange = (index: number, field: keyof NavCategory, value: string) => {
     const updated = [...localCategories]
@@ -72,14 +83,29 @@ const SettingDialog = () => {
     setLocalCategories(updated)
   }
 
-  const handleSave = () => {
-    useConfigStore.setState({ categories: localCategories })
-    toast({
-      title: "保存成功",
-      description: "所有更改已保存并生效。",
-      duration: 3000
-    })
-    setOpen(false)
+  const handleSave = async () => {
+    setIsSaving(true)
+    try {
+      // 先更新本地状态
+      useConfigStore.setState({ categories: localCategories })
+      // 然后保存到 Supabase
+      await saveCategories()
+      toast({
+        title: "保存成功",
+        description: "所有更改已保存并生效。",
+        duration: 3000
+      })
+      setOpen(false)
+    } catch (error) {
+      toast({
+        title: "保存失败",
+        description: error instanceof Error ? error.message : "保存过程中发生错误，请重试。",
+        duration: 5000,
+        variant: "destructive"
+      })
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const handleCancel = () => {
@@ -87,7 +113,7 @@ const SettingDialog = () => {
     setOpen(false)
   }
 
-  const handleResetClick = () => {
+  const handleResetClick = async () => {
     if (!isResetting) {
       setIsResetting(true)
       toast({
@@ -99,22 +125,59 @@ const SettingDialog = () => {
       return
     }
 
-    setLocalCategories(JSON.parse(JSON.stringify(initialNavData)))
-    setIsResetting(false)
-    toast({
-      title: "重置成功",
-      description: "数据已恢复到初始状态。",
-      duration: 3000
-    })
+    try {
+      // 重置到默认配置并保存到 Supabase
+      await resetToDefault()
+      setLocalCategories(JSON.parse(JSON.stringify(initialNavData)))
+      setIsResetting(false)
+      toast({
+        title: "重置成功",
+        description: "数据已恢复到初始状态。",
+        duration: 3000
+      })
+    } catch (error) {
+      toast({
+        title: "重置失败",
+        description: error instanceof Error ? error.message : "重置过程中发生错误，请重试。",
+        duration: 5000,
+        variant: "destructive"
+      })
+      setIsResetting(false)
+    }
+  }
+
+  // 处理设置按钮点击
+  const handleSettingsClick = () => {
+    if (!isAuthenticated) {
+      setShowPasswordDialog(true)
+    } else {
+      setOpen(true)
+    }
+  }
+
+  // 处理管理员验证成功
+  const handleAuthSuccess = () => {
+    setIsAuthenticated(true)
+    setOpen(true)
   }
 
   return (
+    <>
+      <AdminPasswordDialog
+        open={showPasswordDialog}
+        onOpenChange={setShowPasswordDialog}
+        onSuccess={handleAuthSuccess}
+      />
+    <Button 
+      variant="ghost" 
+      size="icon" 
+      className="rounded-full hover:bg-accent"
+      onClick={handleSettingsClick}
+    >
+      <Settings className="h-5 w-5" />
+    </Button>
+    
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" className="rounded-full hover:bg-accent">
-          <Settings className="h-5 w-5" />
-        </Button>
-      </DialogTrigger>
       <DialogContent className="flex h-[80vh] max-h-[80vh] flex-col border-border bg-card text-card-foreground sm:max-w-[700px]">
         <DialogHeader className="flex-shrink-0 space-y-1.5 border-b border-border pb-4">
           <DialogTitle className="text-xl font-semibold tracking-tight">编辑网站数据</DialogTitle>
@@ -237,11 +300,14 @@ const SettingDialog = () => {
             <Button variant="outline" onClick={handleCancel}>
               取消
             </Button>
-            <Button onClick={handleSave}>保存更改</Button>
+            <Button onClick={handleSave} disabled={isSaving || isLoading}>
+              {isSaving ? "保存中..." : "保存更改"}
+            </Button>
           </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    </>
   )
 }
 
