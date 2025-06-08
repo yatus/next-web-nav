@@ -5,6 +5,8 @@ import { AnimatePresence, motion } from "framer-motion"
 
 import { cn } from "@/lib/utils"
 import { useConfigStore } from "@/stores"
+import { siteConfig } from "@/config/site"
+import Link from "next/link"
 
 export function Sidebar() {
   const [activeTabId, setActiveTabId] = useState(0)
@@ -51,7 +53,21 @@ export function Sidebar() {
 
   return (
     <nav className="after:h-[calc(100vh - 65px)] block min-h-screen w-60 flex-row flex-nowrap bg-gray-50 font-semibold sm:bg-background sm:px-6 sm:pb-6">
-      <div className="mx-6 hidden h-14 flex-col items-center justify-center sm:flex"></div>
+      <div className="hidden h-16 items-center sm:flex sm:pl-6">
+        <Link href="/" className="flex items-center space-x-2.5 group">
+          <div className="flex h-8 w-8 items-center justify-center rounded-md bg-muted/50 group-hover:bg-muted transition-all duration-200">
+            <span className="text-sm font-medium text-muted-foreground group-hover:text-foreground">导</span>
+          </div>
+          <div className="flex flex-col">
+            <div className="text-base font-medium text-foreground/90 group-hover:text-foreground transition-colors duration-200">
+              {siteConfig.name}
+            </div>
+            {/* <div className="text-xs text-muted-foreground/60 -mt-0.5">
+              {siteConfig.description}
+            </div> */}
+          </div>
+        </Link>
+      </div>
       <div className="flex-start relative z-40 flex h-auto w-full flex-1 flex-col overflow-y-auto overflow-x-hidden rounded pt-4 opacity-100">
         <div className="flex list-none flex-col md:min-w-full md:flex-col">
           <div className={"flex-none pb-12"}>

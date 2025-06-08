@@ -13,7 +13,7 @@ export function SiteFooter() {
                   className="text-blueGray-500 py-1 text-center text-sm font-semibold md:text-left"
                   rel="noreferrer"
                 >
-                  Copyright © 2023 Creative Li WenKai
+                  Copyright © 2025 Creative Li WenKai
                 </a>
               </div>
             </div>

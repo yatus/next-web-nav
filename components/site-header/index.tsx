@@ -5,7 +5,7 @@ import { useCallback, useState } from "react"
 
 import { siteConfig } from "@/config/site"
 
-import { Circle, Laptop, Moon, Sun } from "lucide-react"
+import { Circle, Laptop, Moon, Sun, Search } from "lucide-react"
 import { useTheme } from "next-themes"
 import { DialogTitle } from "@radix-ui/react-dialog"
 
@@ -36,70 +36,85 @@ export function SiteHeader() {
   const { categories } = useConfigStore()
 
   return (
-    <header className="sticky top-0 z-40 w-full bg-background dark:border-slate-50/[0.06] lg:border-b lg:border-slate-900/10">
-      <div className="container m-0 flex h-16 items-center space-x-4 sm:justify-between sm:space-x-0">
-        <nav className="flex flex-1 items-center justify-end space-x-4">
-          <div className="flex w-full items-center space-x-1 sm:w-auto">
-            <Button
-              variant="outline"
-              className="relative h-8 w-full justify-start rounded-[0.5rem] bg-muted/50 text-sm font-normal text-muted-foreground shadow-none sm:pr-12 md:w-40 lg:w-56 xl:w-64"
-              onClick={() => setOpen(true)}
-            >
-              搜索网站...
-            </Button>
-            <Link href={siteConfig.links.github} target="_blank" rel="noreferrer">
-              <Button className="rounded-full" variant="ghost" size="icon">
-                <Icons.gitHub className="h-5 w-5" />
-                <span className="sr-only">GitHub</span>
-              </Button>
-            </Link>
-            <Link href={siteConfig.links.twitter} target="_blank" rel="noreferrer">
-              <Button className="rounded-full" variant="ghost" size="icon">
-                <Icons.twitter className="h-5 w-5 fill-current" />
-                <span className="sr-only">Twitter</span>
-              </Button>
-            </Link>
-            <ThemeToggle />
-            <SettingDialog />
-          </div>
-        </nav>
+    <header className="sticky top-0 z-40 w-full border-b bg-background/80 backdrop-blur-md supports-[backdrop-filter]:bg-background/60">
+      <div className="container m-0 relative flex h-16 items-center justify-center px-4">
+        {/* 搜索框 - 居中显示 */}
+        <div className="w-full max-w-md">
+          <Button
+            variant="outline"
+            className="relative h-9 w-full justify-start text-sm text-muted-foreground bg-muted/40 border-muted-foreground/20 hover:bg-muted/60 hover:text-foreground transition-all duration-200 group"
+            onClick={() => setOpen(true)}
+          >
+            <Search className="mr-2 h-4 w-4 group-hover:text-primary transition-colors duration-200" />
+            <span className="flex-1 text-left">搜索网站和工具...</span>
+            <div className="flex items-center space-x-1 text-xs text-muted-foreground/60">
+              <kbd className="px-1.5 py-0.5 bg-background/80 rounded border text-xs font-mono">⌘</kbd>
+              <kbd className="px-1.5 py-0.5 bg-background/80 rounded border text-xs font-mono">K</kbd>
+            </div>
+          </Button>
+        </div>
+
+        {/* 右侧：工具栏 - 绝对定位到右侧 */}
+        <div className="absolute right-4 flex items-center space-x-1">
+          <ThemeToggle />
+          <div className="h-4 w-px bg-border mx-2" />
+          <SettingDialog />
+        </div>
       </div>
+
       <CommandDialog open={open} onOpenChange={setOpen}>
-        <DialogTitle className="hidden" />
-        <CommandInput placeholder="Type a command or search..." />
+        <DialogTitle className="sr-only">搜索命令</DialogTitle>
+        <CommandInput placeholder="搜索网站和工具..." className="text-base" />
         <CommandList>
-          <CommandEmpty>No results found.</CommandEmpty>
+          <CommandEmpty>
+            <div className="flex flex-col items-center justify-center py-6 text-center">
+              <Search className="h-8 w-8 text-muted-foreground/40 mb-2" />
+              <p className="text-sm text-muted-foreground">未找到相关结果</p>
+              <p className="text-xs text-muted-foreground/60 mt-1">尝试使用不同的关键词</p>
+            </div>
+          </CommandEmpty>
+          
           {categories.map((category) => (
             <CommandGroup heading={category.title} key={category.title}>
               {category.items.map((navItem) => (
                 <CommandItem
                   key={navItem.link}
-                  value={navItem.title}
+                  value={`${navItem.title} ${navItem.desc}`}
                   onSelect={() => {
                     runCommand(() => window.open(navItem.link, "_blank"))
                   }}
+                  className="flex items-start space-x-3 px-3 py-2"
                 >
-                  <div className="mr-2 flex h-4 w-4 items-center justify-center">
-                    <Circle className="h-3 w-3" />
+                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-muted">
+                    <Circle className="h-3 w-3 text-muted-foreground" />
                   </div>
-                  {navItem.title}
+                  <div className="flex flex-col space-y-1 min-w-0 flex-1">
+                    <div className="font-medium text-sm">{navItem.title}</div>
+                    {navItem.desc && (
+                      <div className="text-xs text-muted-foreground line-clamp-2">
+                        {navItem.desc}
+                      </div>
+                    )}
+                  </div>
                 </CommandItem>
               ))}
             </CommandGroup>
           ))}
+          
           <CommandSeparator />
-          <CommandGroup heading="Theme">
+          
+          <CommandGroup heading="偏好设置">
             <CommandItem onSelect={() => runCommand(() => setTheme("light"))}>
-              <Sun />
-              Light
+              <Sun className="mr-3 h-4 w-4" />
+              <span>浅色主题</span>
             </CommandItem>
             <CommandItem onSelect={() => runCommand(() => setTheme("dark"))}>
-              <Moon />
-              Dark
+              <Moon className="mr-3 h-4 w-4" />
+              <span>深色主题</span>
             </CommandItem>
             <CommandItem onSelect={() => runCommand(() => setTheme("system"))}>
-              <Laptop />
-              System
+              <Laptop className="mr-3 h-4 w-4" />
+              <span>跟随系统</span>
             </CommandItem>
           </CommandGroup>
         </CommandList>
